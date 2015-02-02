@@ -28,7 +28,7 @@ class MigrationsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Create the migrations needed for and OAuth 2 Server';
+    protected $description = 'Create the migrations needed for an OAuth 2 Server';
 
     /**
      * Create a new reminder table command instance.
