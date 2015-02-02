@@ -17,7 +17,6 @@ use League\OAuth2\Server\Exception\OAuthException;
 use LucaDegasperi\OAuth2Server\Filters\CheckAuthCodeRequestFilter;
 use LucaDegasperi\OAuth2Server\Filters\OAuthFilter;
 use LucaDegasperi\OAuth2Server\Filters\OAuthOwnerFilter;
-use Illuminate\Contracts\Exception\Handler;
 
 class OAuth2ServerServiceProvider extends ServiceProvider
 {
@@ -31,10 +30,11 @@ class OAuth2ServerServiceProvider extends ServiceProvider
      * Bootstrap the application events.
      * @return void
      */
-    public function boot(Handler $handler)
+    public function boot()
     {
-        $this->package('lucadegasperi/oauth2-server-laravel', 'oauth2-server-laravel', __DIR__.'/');
-        $this->registerErrorHandlers($handler);
+        $this->publishes([
+            __DIR__.'/config/oauth2.php' => config_path('oauth2-server.php'),
+        ]);
         $this->bootFilters();
     }
 
@@ -56,19 +56,19 @@ class OAuth2ServerServiceProvider extends ServiceProvider
     public function registerAuthorizer()
     {
         $this->app->bindShared('oauth2-server.authorizer', function ($app) {
-            $config = $app['config']->get('oauth2-server-laravel::oauth2');
+            $config = $app['config']->get('oauth2-server');
             $issuer = $app->make('League\OAuth2\Server\AuthorizationServer')
-                          ->setClientStorage($app->make('League\OAuth2\Server\Storage\ClientInterface'))
-                          ->setSessionStorage($app->make('League\OAuth2\Server\Storage\SessionInterface'))
-                          ->setAuthCodeStorage($app->make('League\OAuth2\Server\Storage\AuthCodeInterface'))
-                          ->setAccessTokenStorage($app->make('League\OAuth2\Server\Storage\AccessTokenInterface'))
-                          ->setRefreshTokenStorage($app->make('League\OAuth2\Server\Storage\RefreshTokenInterface'))
-                          ->setScopeStorage($app->make('League\OAuth2\Server\Storage\ScopeInterface'))
-                          ->requireScopeParam($config['scope_param'])
-                          ->setDefaultScope($config['default_scope'])
-                          ->requireStateParam($config['state_param'])
-                          ->setScopeDelimiter($config['scope_delimiter'])
-                          ->setAccessTokenTTL($config['access_token_ttl']);
+            ->setClientStorage($app->make('League\OAuth2\Server\Storage\ClientInterface'))
+            ->setSessionStorage($app->make('League\OAuth2\Server\Storage\SessionInterface'))
+            ->setAuthCodeStorage($app->make('League\OAuth2\Server\Storage\AuthCodeInterface'))
+            ->setAccessTokenStorage($app->make('League\OAuth2\Server\Storage\AccessTokenInterface'))
+            ->setRefreshTokenStorage($app->make('League\OAuth2\Server\Storage\RefreshTokenInterface'))
+            ->setScopeStorage($app->make('League\OAuth2\Server\Storage\ScopeInterface'))
+            ->requireScopeParam($config['scope_param'])
+            ->setDefaultScope($config['default_scope'])
+            ->requireStateParam($config['state_param'])
+            ->setScopeDelimiter($config['scope_delimiter'])
+            ->setAccessTokenTTL($config['access_token_ttl']);
 
             // add the supported grant types to the authorization server
             foreach ($config['grant_types'] as $grantIdentifier => $grantParams) {
@@ -115,7 +115,7 @@ class OAuth2ServerServiceProvider extends ServiceProvider
         });
 
         $this->app->bindShared('LucaDegasperi\OAuth2Server\Filters\OAuthFilter', function ($app) {
-            $httpHeadersOnly = $app['config']->get('oauth2-server-laravel::oauth2.http_headers_only');
+            $httpHeadersOnly = $app['config']->get('oauth2-server.http_headers_only');
             return new OAuthFilter($app['oauth2-server.authorizer'], $httpHeadersOnly);
         });
 
@@ -156,22 +156,5 @@ class OAuth2ServerServiceProvider extends ServiceProvider
         $this->app['router']->filter('check-authorization-params', 'LucaDegasperi\OAuth2Server\Filters\CheckAuthCodeRequestFilter');
         $this->app['router']->filter('oauth', 'LucaDegasperi\OAuth2Server\Filters\OAuthFilter');
         $this->app['router']->filter('oauth-owner', 'LucaDegasperi\OAuth2Server\Filters\OAuthOwnerFilter');
-    }
-
-    /**
-     * Register the OAuth error handlers
-     * @return void
-     */
-    private function registerErrorHandlers(Handler $handler)
-    {
-        $handler->error(function(OAuthException $e) {
-            return new JsonResponse([
-                    'error' => $e->errorType,
-                    'error_description' => $e->getMessage()
-                ],
-                $e->httpStatusCode,
-                $e->getHttpHeaders()
-            );
-        });
     }
 }
